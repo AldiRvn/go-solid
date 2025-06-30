@@ -13,18 +13,22 @@ type User struct {
 	Password string
 }
 
-type UserRepository struct {
-	Users []User
+type UserRepository interface {
+	AddUser(user User)
 }
 
-func NewUserRepository() *UserRepository {
-	return &UserRepository{
-		Users: make([]User, 0),
+type InMemoryUserRepository struct {
+	users []User
+}
+
+func NewInMemoryUserRepository() *InMemoryUserRepository {
+	return &InMemoryUserRepository{
+		users: make([]User, 0),
 	}
 }
 
-func (ur *UserRepository) AddUser(user User) {
-	ur.Users = append(ur.Users, user)
+func (ur *InMemoryUserRepository) AddUser(user User) {
+	ur.users = append(ur.users, user)
 }
 
 type UserManager interface {
@@ -37,7 +41,7 @@ type AuthenticationManager interface {
 }
 
 type AuthenticationService struct {
-	userRepository *UserRepository
+	userRepository *InMemoryUserRepository
 	authenticator  []Authenticator
 }
 
@@ -61,7 +65,7 @@ func (fa *FingerprintAuthenticator) Authenticate(user User, credentials any) boo
 	return true
 }
 
-func NewAuthenticationService(userRepository *UserRepository) *AuthenticationService {
+func NewAuthenticationService(userRepository *InMemoryUserRepository) *AuthenticationService {
 	return &AuthenticationService{
 		userRepository: userRepository,
 		authenticator:  make([]Authenticator, 0),
@@ -87,7 +91,7 @@ func (as *AuthenticationService) AuthenticationUser(user User, credentials any) 
 func Test_Combined(t *testing.T) {
 	fmt.Println(aurora.Green("Combined()"))
 
-	userRepository := NewUserRepository()
+	userRepository := NewInMemoryUserRepository()
 	user := User{
 		Username: "Jhon",
 		Password: "Doe",
