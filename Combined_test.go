@@ -27,6 +27,15 @@ func (ur *UserRepository) AddUser(user User) {
 	ur.Users = append(ur.Users, user)
 }
 
+type UserManager interface {
+	AddUser(user User)
+}
+
+type AuthenticationManager interface {
+	AddAuthenticator(authenticator Authenticator)
+	AuthenciateUser(user User, credentials any)
+}
+
 type AuthenticationService struct {
 	userRepository *UserRepository
 	authenticator  []Authenticator
@@ -48,7 +57,7 @@ func (pa *PasswordAuthenticator) Authenticate(user User, credentials any) bool {
 
 type FingerprintAuthenticator struct{}
 
-func (fa *FingerprintAuthenticator) Authenticate(user User, credentials any) (res bool) {
+func (fa *FingerprintAuthenticator) Authenticate(user User, credentials any) bool {
 	return true
 }
 
@@ -64,8 +73,11 @@ func (as *AuthenticationService) AddAuthenticator(authenticator Authenticator) {
 }
 
 func (as *AuthenticationService) AuthenticationUser(user User, credentials any) (ok bool) {
+	var authenticatedBy any
 	for _, authenticator := range as.authenticator {
 		if authenticator.Authenticate(user, credentials) {
+			authenticatedBy = fmt.Sprintf("%T", authenticator)
+			fmt.Printf("authenticatedBy: %v\n", authenticatedBy)
 			return true
 		}
 	}
@@ -86,19 +98,26 @@ func Test_Combined(t *testing.T) {
 	authService.AddAuthenticator(&PasswordAuthenticator{})
 	authService.AddAuthenticator(&FingerprintAuthenticator{})
 
-	password := "Doe"
-	isAuthenticatedPassword := authService.AuthenticationUser(user, password)
-
+	isAuthenticatedPassword := authService.AuthenticationUser(user, "Doe")
 	if isAuthenticatedPassword {
 		log.Println("Password authentication success, welcome", user.Username)
 	} else {
 		log.Println("Password authentication failed, invalid credentials")
 	}
 
-	isAuthenticatedFingerprint := authService.AuthenticationUser(user, "fingerprint_data")
-	if isAuthenticatedFingerprint {
-		log.Println("Fingerprint authentication success, welcome", user.Username)
+	user1 := User{
+		Username: "Sekiro",
+		Password: "Sekijo",
+	}
+	userManager := userRepository
+	userManager.AddUser(user1)
+
+	//? Ini seharusnya gagal karena passwordnya salah, tapi
+	// tetap berhasil login karena lewat Fingerprint Authenticator
+	isAuthenticatedPassword = authService.AuthenticationUser(user1, "Doe")
+	if isAuthenticatedPassword {
+		log.Println("Password authentication success, welcome", user1.Username)
 	} else {
-		log.Println("Fingerprint authentication failed, invalid credentials")
+		log.Println("Password authentication failed, invalid credentials")
 	}
 }
