@@ -29,25 +29,42 @@ func (ur *UserRepository) AddUser(user User) {
 }
 
 type AuthenticationService struct {
-	UserRepository *UserRepository
+	userRepository *UserRepository
+	authenticator  []Authenticator
+}
+
+type Authenticator interface {
+	Authenticate(user User, password string) bool
+}
+
+type PasswordAuthenticator struct{}
+
+func (pa *PasswordAuthenticator) Authenticate(user User, password string) bool {
+	return user.Password == password
 }
 
 func NewAuthenticationService(userRepository *UserRepository) *AuthenticationService {
 	return &AuthenticationService{
-		UserRepository: userRepository,
+		userRepository: userRepository,
+		authenticator:  make([]Authenticator, 0),
 	}
 }
 
-func (as *AuthenticationService) AuthenticationUser(username, password string) (ok bool, err error) {
-	user, err := as.getUserByUsername(username)
-	if err != nil {
-		return false, err
+func (as *AuthenticationService) AddAuthenticator(authenticator Authenticator) {
+	as.authenticator = append(as.authenticator, authenticator)
+}
+
+func (as *AuthenticationService) AuthenticationUser(user User, password string) (ok bool) {
+	for _, authenticator := range as.authenticator {
+		if authenticator.Authenticate(user, password) {
+			return true
+		}
 	}
-	return user.Password == password, nil
+	return
 }
 
 func (as *AuthenticationService) getUserByUsername(username string) (res User, err error) {
-	for _, user := range as.UserRepository.Users {
+	for _, user := range as.userRepository.Users {
 		if user.Username == username {
 			return user, nil
 		}
@@ -67,12 +84,10 @@ func Test_Combined(t *testing.T) {
 	userRepository.AddUser(user)
 
 	authService := NewAuthenticationService(userRepository)
+	authService.AddAuthenticator(&PasswordAuthenticator{})
 
-	username, password := "Jhon", "Doe"
-	isAuthentication, err := authService.AuthenticationUser(username, password)
-	if err != nil {
-		log.Println("Authentication failed:", err.Error())
-	}
+	password := "Doe"
+	isAuthentication := authService.AuthenticationUser(user, password)
 
 	if isAuthentication {
 		log.Println("Welcome", user.Username)
